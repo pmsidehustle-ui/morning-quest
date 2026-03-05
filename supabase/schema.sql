@@ -36,6 +36,9 @@ create table if not exists public.wallet (
   last_perfect_ymd text,
   pet_hunger int not null default 60,
   pet_happiness int not null default 60,
+  pet_stage int not null default 1,
+  chest_tokens int not null default 0,
+  last_chest_ymd text,
   updated_at timestamptz not null default now()
 );
 

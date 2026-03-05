@@ -134,3 +134,8 @@ It uses row-level security and role checks to prevent the child account from app
 - `supabase/schema.sql` — tables + RLS policies
 - `supabase/seed.sql` — starter family/tasks/rewards (edit UUIDs)
 - `src/` — app code
+
+
+## Upgrades: Boss Battle + Pet Evolution + Treasure Chests
+If you already ran the schema earlier, run this in Supabase SQL Editor:
+- `supabase/migrations_001_gamification.sql`

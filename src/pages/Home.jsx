@@ -137,6 +137,10 @@ export default function Home({ ctx }) {
         .eq('user_id', profile.id)
     }
 
+    if (task.is_required) {
+      await maybeTaskChest()
+    }
+
     // if that finishes all required tasks, finalize
     const willCompletedRequired = completedRequiredCount + (task.is_required ? 1 : 0)
     if (willCompletedRequired === requiredTasks.length) {
@@ -144,7 +148,42 @@ export default function Home({ ctx }) {
     }
   }
 
-  const finalizeDay = async () => {
+const maybeTaskChest = async () => {
+  if (!wallet) return
+  if (!isSchoolDay) return
+  if (secondsToLeave <= 0) return
+  // At most 1 chest per day (prevents spam)
+  if ((wallet.last_chest_ymd ?? null) === ymd) return
+
+  // 12% chance on completing a required task
+  const roll = Math.random()
+  if (roll >= 0.12) return
+
+  const awards = [5, 10, 15, 25]
+  const award = awards[Math.floor(Math.random() * awards.length)]
+  const newBal = (wallet.coin_balance ?? 0) + award
+  const newTokens = (wallet.chest_tokens ?? 0) + 1
+
+  const { data: w2, error } = await supabase.from('wallet')
+    .update({
+      coin_balance: newBal,
+      chest_tokens: newTokens,
+      last_chest_ymd: ymd,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('user_id', profile.id)
+    .select('*')
+    .single()
+
+  if (!error && w2) {
+    setWallet(w2)
+    setToast(`Treasure found! +${award} 🪙 and +1 💎`)
+    setTimeout(() => setToast(null), 2800)
+  }
+}
+
+const finalizeDay = async () => {
+
     if (!dailyRun?.id || !wallet) return
 
     // Determine perfect morning: all required done and before leave_house_time (07:25)
@@ -180,14 +219,50 @@ export default function Home({ ctx }) {
       }
     }
 
-    // Daily bonus coins for finishing required tasks
-    let bonus = 0
-    if (isSchoolDay) {
-      bonus += 25
-      // early bonus: finish by 07:15? We'll base it on leave deadline: if > 10 mins remaining.
-      if (secondsToLeave >= 10 * 60) bonus += 15
-    }
-    const newBal = (wallet.coin_balance ?? 0) + bonus
+    // Daily bonus coins for finishing required tasks + boss-battle timing bonuses
+let bonus = 0
+let bossBonus = 0
+
+if (isSchoolDay) {
+  // Baseline completion bonus (keeps it rewarding even without speed)
+  bonus += 10
+
+  // Boss battle tiers (based on leave-house deadline 07:25)
+  // secondsToLeave is time remaining until 07:25 at the moment of completion
+  if (secondsToLeave >= 20 * 60) bossBonus = 40   // by 07:05
+  else if (secondsToLeave >= 10 * 60) bossBonus = 25 // by 07:15
+  else if (secondsToLeave > 0) bossBonus = 15     // by 07:25
+
+  bonus += bossBonus
+}
+
+// Pet evolution: upgrade at streak milestones (7/14/28 perfect mornings)
+let petStage = wallet.pet_stage ?? 1
+if (perfect) {
+  if (streak >= 28) petStage = Math.max(petStage, 4)
+  else if (streak >= 14) petStage = Math.max(petStage, 3)
+  else if (streak >= 7) petStage = Math.max(petStage, 2)
+}
+
+// Treasure chest: at most 1 chest per day; only on perfect mornings
+let chestTokens = wallet.chest_tokens ?? 0
+let chestAward = 0
+const alreadyChestedToday = (wallet.last_chest_ymd ?? null) === ymd
+if (perfect && !alreadyChestedToday) {
+  // 25% chance of a chest on perfect morning
+  const roll = Math.random()
+  if (roll < 0.25) {
+    const r = Math.random()
+    if (r < 0.45) chestAward = 10
+    else if (r < 0.80) chestAward = 20
+    else if (r < 0.95) chestAward = 35
+    else chestAward = 60
+
+    chestTokens += 1
+  }
+}
+
+const newBal = (wallet.coin_balance ?? 0) + bonus + chestAward
 
     const { data: w2 } = await supabase.from('wallet')
       .update({
@@ -196,6 +271,9 @@ export default function Home({ ctx }) {
         shields_available: shields,
         last_run_ymd: ymd,
         last_perfect_ymd: perfect ? ymd : wallet.last_perfect_ymd,
+        pet_stage: petStage,
+        chest_tokens: chestTokens,
+        last_chest_ymd: (chestAward > 0) ? ymd : wallet.last_chest_ymd,
         updated_at: new Date().toISOString(),
       })
       .eq('user_id', profile.id)
@@ -204,7 +282,11 @@ export default function Home({ ctx }) {
 
     if (w2) setWallet(w2)
 
-    setToast(perfect ? `Perfect morning! +${bonus} coins 🎉` : `Done! +${bonus} coins`)
+    if (chestAward > 0) {
+      setToast(`Perfect morning! +${bonus} coins + Treasure +${chestAward} 🪙 and +1 💎 🎉`)
+    } else {
+      setToast(perfect ? `Perfect morning! +${bonus} coins 🎉` : `Done! +${bonus} coins`)
+    }
     setTimeout(() => setToast(null), 3200)
   }
 
@@ -281,6 +363,18 @@ export default function Home({ ctx }) {
                 </div>
               </div>
 
+<div style={{ marginTop: 10 }} className="card">
+  <div className="h2">Boss battle</div>
+  <div className="small">
+    Beat the clock for bonus coins:
+    <ul style={{ margin: '8px 0 0 16px', padding: 0, color: 'var(--muted)' }}>
+      <li><b>+40</b> if finished by <b>07:05</b></li>
+      <li><b>+25</b> if finished by <b>07:15</b></li>
+      <li><b>+15</b> if finished by <b>07:25</b> (on time)</li>
+    </ul>
+  </div>
+</div>
+
               <div style={{ marginTop: 14 }} className="kpis">
                 <div className="kpi">
                   <div className="label">Progress</div>
@@ -349,8 +443,10 @@ export default function Home({ ctx }) {
           <div className="h2">Pet</div>
           <div style={{ display:'grid', gap:10 }}>
             <div className="card" style={{ background:'rgba(0,0,0,0.10)' }}>
-              <div style={{ fontSize: 44 }}>🐾</div>
+              <div style={{ fontSize: 44 }}>{petEmoji(wallet?.pet_stage ?? 1)}</div>
               <div style={{ fontWeight: 900, fontSize: 18 }}>Buddy</div>
+              <div className="small">Stage: {wallet?.pet_stage ?? 1}</div>
+              <div className="small">Treasure tokens: {wallet?.chest_tokens ?? 0} 💎</div>
               <div className="small">Hunger: {wallet?.pet_hunger ?? 60}/100</div>
               <div className="small">Happiness: {wallet?.pet_happiness ?? 60}/100</div>
             </div>
@@ -371,6 +467,14 @@ export default function Home({ ctx }) {
       </div>
     </div>
   )
+}
+
+function petEmoji(stage) {
+  const s = Number(stage ?? 1)
+  if (s >= 4) return '🦊'
+  if (s === 3) return '🐺'
+  if (s === 2) return '🐶'
+  return '🐾'
 }
 
 function RewardsPanel({ familyId, userId, wallet, onToast }) {
