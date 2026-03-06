@@ -22,7 +22,8 @@ export default function Home({ ctx }) {
   const now = useMemo(() => new Date(), [tick])
   const ymd = useMemo(() => ymdInSydney(now), [now])
   const dow = useMemo(() => dowInSydney(now), [now])
-  const isSchoolDay = useMemo(() => schoolDayMonThu(dow), [dow])
+  const isSchoolDay = [1,2,3,4].includes(now.getDay()) // Mon-Thu
+const isNonSchoolDay = !isSchoolDay
 
   const secondsToLeave = useMemo(() => isSchoolDay ? secondsUntilSydneyTime(settings.leave_house_time) : 0, [isSchoolDay, settings.leave_house_time, tick])
   const secondsToBus = useMemo(() => isSchoolDay ? secondsUntilSydneyTime(settings.bus_time) : 0, [isSchoolDay, settings.bus_time, tick])

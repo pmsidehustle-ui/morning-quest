@@ -49,6 +49,8 @@ create table if not exists public.tasks (
   title text not null,
   coin_value int not null default 10,
   is_required boolean not null default true,
+  applies_school boolean not null default true,
+  applies_nonschool boolean not null default true,
   sort_order int not null default 0,
   created_at timestamptz not null default now()
 );

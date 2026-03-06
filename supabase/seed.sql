@@ -40,8 +40,8 @@ insert into public.tasks (family_id, title, coin_value, is_required, sort_order)
 delete from public.rewards where family_id = '11111111-1111-1111-1111-111111111111';
 
 insert into public.rewards (family_id, title, coin_cost, requires_parent_approval) values
-('11111111-1111-1111-1111-111111111111','20 min phone apps',30,true),
-('11111111-1111-1111-1111-111111111111','30 min PlayStation',50,true),
-('11111111-1111-1111-1111-111111111111','1 TV episode',40,true),
-('11111111-1111-1111-1111-111111111111','Choose dessert',80,true),
-('11111111-1111-1111-1111-111111111111','Movie night',120,true);
+('11111111-1111-1111-1111-111111111111', '20 min phone apps', 30, true, true, true),
+('11111111-1111-1111-1111-111111111111', '30 min PlayStation', 50, true, true, true),
+('11111111-1111-1111-1111-111111111111', '1 TV episode', 40, true, true, true),
+('11111111-1111-1111-1111-111111111111', 'Choose dessert', 80, true, true, true),
+('11111111-1111-1111-1111-111111111111', 'Movie night', 120, true, true, true);
